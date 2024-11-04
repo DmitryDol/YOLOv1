@@ -26,8 +26,9 @@ class YOLOLoss(nn.Module):
         # ======================= #
         box_predictions = exists_box * (
             (
-                best_box * predictions[..., 26:30]) 
+                best_box * predictions[..., 26:30] 
                 + (1 - best_box) * predictions[..., 21:25]
+            )
         )
 
         box_targets = exists_box * target[..., 21:25]

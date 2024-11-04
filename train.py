@@ -12,14 +12,14 @@ from torch.utils.data import DataLoader
 from model import YOLOv1
 from dataset import VOCDataset
 from utils import (
-    intersection_over_union,
     non_max_suppression,
     mean_average_precision,
+    intersection_over_union,
     cellboxes_to_boxes,
     get_bboxes,
     plot_image,
+    save_checkpoint,
     load_checkpoint,
-    save_checkpoint
 )
 from loss import YOLOLoss
 
@@ -30,7 +30,7 @@ torch.manual_seed(seed)
 # Hyperparameters etc.
 LEARNING_RATE = 2e-5
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-BATCH_SIZE = 16
+BATCH_SIZE = 64 # 64 in original paper 
 WEIGHT_DECAY = 0
 EPOCHS = 100
 NUM_WORKERS = 2
@@ -54,6 +54,7 @@ class Compose(object):
 
 transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
 
+
 def train_fn(train_loader, model, optimizer, loss_fn):
     loop = tqdm(train_loader, leave=True)
     mean_loss = []
@@ -67,7 +68,7 @@ def train_fn(train_loader, model, optimizer, loss_fn):
         loss.backward()
         optimizer.step()
 
-        # update the progress bar
+        # update progress bar
         loop.set_postfix(loss=loss.item())
 
     print(f"Mean loss was {sum(mean_loss)/len(mean_loss)}")
@@ -87,6 +88,7 @@ def main():
         img_dir=IMG_DIR,
         label_dir=LABEL_DIR,
     )
+
     test_dataset = VOCDataset(
         "data/test.csv",
         transform=transform,
@@ -122,12 +124,12 @@ def main():
 
         #    import sys
         #    sys.exit()
-        pred_boxes, true_boxes = get_bboxes(
+        pred_boxes, target_boxes = get_bboxes(
             train_loader, model, iou_threshold=0.5, threshold=0.4
         )
 
         mean_avg_prec = mean_average_precision(
-            pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint"
+            pred_boxes, target_boxes, iou_threshold=0.5, box_format="midpoint"
         )
 
         print(f"Train mAP: {mean_avg_prec}")
