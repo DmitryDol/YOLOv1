@@ -1,7 +1,6 @@
-
-
-
-
+"""
+Main training file
+"""
 
 import torch
 import torchvision.transforms as transforms
@@ -30,13 +29,17 @@ torch.manual_seed(seed)
 # Hyperparameters etc.
 LEARNING_RATE = 2e-5
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-BATCH_SIZE = 64 # 64 in original paper 
-WEIGHT_DECAY = 0
-EPOCHS = 100
-NUM_WORKERS = 2
+BATCH_SIZE = 32 # 64 in original paper 
+WEIGHT_DECAY = 2e-4
+EPOCHS = 1000
+# set num workers to the number of available cpu cores
+NUM_WORKERS = 2 # os.cpu_count()
 PIN_MEMORY = True
+# Need to load pretrained model
 LOAD_MODEL = False
-LOAD_MODEL_FILE = "overfit.pth.tar"
+# Path to pretrained model
+LOAD_MODEL_FILE = "checkpoints/100examples_model.pth.tar"
+# Path to images and labels
 IMG_DIR = "data/images"
 LABEL_DIR = "data/labels"
 
@@ -55,7 +58,7 @@ class Compose(object):
 transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(),])
 
 
-def train_fn(train_loader, model, optimizer, loss_fn):
+def train_fn(train_loader: DataLoader, model: YOLOv1, optimizer: optim.Adam, loss_fn: YOLOLoss) -> None:
     loop = tqdm(train_loader, leave=True)
     mean_loss = []
 
@@ -76,21 +79,16 @@ def train_fn(train_loader, model, optimizer, loss_fn):
 
 def main():
     model = YOLOv1(split_size=7, num_boxes=2, num_classes=20).to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    optimizer = optim.Adam(
+        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+    )
     loss_fn = YOLOLoss()
-    
+
     if LOAD_MODEL:
         load_checkpoint(torch.load(LOAD_MODEL_FILE), model, optimizer)
 
     train_dataset = VOCDataset(
         "data/100examples.csv",
-        transform=transform,
-        img_dir=IMG_DIR,
-        label_dir=LABEL_DIR,
-    )
-
-    test_dataset = VOCDataset(
-        "data/test.csv",
         transform=transform,
         img_dir=IMG_DIR,
         label_dir=LABEL_DIR,
@@ -105,25 +103,9 @@ def main():
         drop_last=True,
     )
 
-    test_loader = DataLoader(
-        dataset=test_dataset,
-        batch_size=BATCH_SIZE,
-        num_workers=NUM_WORKERS,
-        pin_memory=PIN_MEMORY,
-        shuffle=True,
-        drop_last=True,
-    )
+    print('start training')
 
     for epoch in range(EPOCHS):
-        # for x, y in train_loader:
-        #    x = x.to(DEVICE)
-        #    for idx in range(8):
-        #        bboxes = cellboxes_to_boxes(model(x))
-        #        bboxes = non_max_suppression(bboxes[idx], iou_threshold=0.5, threshold=0.4, box_format="midpoint")
-        #        plot_image(x[idx].permute(1,2,0).to("cpu"), bboxes)
-
-        #    import sys
-        #    sys.exit()
         pred_boxes, target_boxes = get_bboxes(
             train_loader, model, iou_threshold=0.5, threshold=0.4
         )
@@ -131,20 +113,24 @@ def main():
         mean_avg_prec = mean_average_precision(
             pred_boxes, target_boxes, iou_threshold=0.5, box_format="midpoint"
         )
-
         print(f"Train mAP: {mean_avg_prec}")
-
+  
         if mean_avg_prec > 0.9:
+           checkpoint = {
+               "state_dict": model.state_dict(),
+               "optimizer": optimizer.state_dict(),
+           }
+           save_checkpoint(checkpoint, filename=LOAD_MODEL_FILE, epoch=epoch)
+           break
+        
+        if epoch % 100 == 0 and epoch > 0:
             checkpoint = {
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
             }
-            save_checkpoint(checkpoint, filename=LOAD_MODEL_FILE)
-            import time
-            time.sleep(100)
+            save_checkpoint(checkpoint, filename=f"checkpoint_epoch_{epoch}.pth.tar", epoch=epoch)
 
         train_fn(train_loader, model, optimizer, loss_fn)
-        
 
 
 if __name__ == "__main__":

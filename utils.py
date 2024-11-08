@@ -239,7 +239,7 @@ def get_bboxes(
     threshold,
     pred_format="cells",
     box_format="midpoint",
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    device="cuda",
 ):
     all_pred_boxes = []
     all_true_boxes = []
@@ -338,9 +338,10 @@ def cellboxes_to_boxes(out, S=7):
 
     return all_bboxes
 
-def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
-    print("=> Saving checkpoint")
-    torch.save(state, filename)
+def save_checkpoint(state, filename="my_checkpoint.pth.tar", epoch=None):
+    #checkpoint_path = f"/content/drive/MyDrive/Colab Notebooks/YOLOv1/checkpoints/{filename}"
+    print(f"=> Saving checkpoint at epoch {epoch}")
+    torch.save(state, f'checkpoints/{filename}')
 
 
 def load_checkpoint(checkpoint, model, optimizer):
