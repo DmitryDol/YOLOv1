@@ -202,6 +202,28 @@ def mean_average_precision(
 
 def plot_image(image, boxes):
     """Plots predicted bounding boxes on the image"""
+    classes = [
+        'aeroplane', 
+        'bicycle', 
+        'bird',
+        'boat', 
+        'bottle', 
+        'bus', 
+        'car', 
+        'cat', 
+        'chair', 
+        'cow', 
+        'dining_table', 
+        'dog', 
+        'horse', 
+        'motorbike', 
+        'person', 
+        'potted_plant', 
+        'sheep', 
+        'sofa', 
+        'train',
+        'tv_monitor'
+    ]
     im = np.array(image)
     height, width, _ = im.shape
 
@@ -215,6 +237,7 @@ def plot_image(image, boxes):
 
     # Create a Rectangle potch
     for box in boxes:
+        pred_class_conf = box[0:2]
         box = box[2:]
         assert len(box) == 4, "Got more values than in x, y, w, h, in a box!"
         upper_left_x = box[0] - box[2] / 2
@@ -229,6 +252,17 @@ def plot_image(image, boxes):
         )
         # Add the patch to the Axes
         ax.add_patch(rect)
+        
+        # Добавляем текст с классом и точностью над прямоугольником
+        class_id, confidence = pred_class_conf
+        text = f"Class: {classes[int(class_id)]}, Conf: {confidence:.2f}"
+        ax.text(
+            upper_left_x * width, 
+            (upper_left_y * height) - 10,
+            text,
+            bbox=dict(facecolor='white', alpha=0.7),
+            fontsize=8
+        )
 
     plt.show()
 
@@ -291,11 +325,7 @@ def convert_cellboxes(predictions, S=7):
     """
     Converts bounding boxes output from Yolo with
     an image split size of S into entire image ratios
-    rather than relative to cell ratios. Tried to do this
-    vectorized, but this resulted in quite difficult to read
-    code... Use as a black box? Or implement a more intuitive,
-    using 2 for loops iterating range(S) and convert them one
-    by one, resulting in a slower but more readable implementation.
+    rather than relative to cell ratios. 
     """
 
     predictions = predictions.to("cpu")
@@ -344,7 +374,11 @@ def save_checkpoint(state, filename="my_checkpoint.pth.tar", epoch=None):
     torch.save(state, f'checkpoints/{filename}')
 
 
-def load_checkpoint(checkpoint, model, optimizer):
+def load_checkpoint(checkpoint, model, optimizer, device='cuda'):
     print("=> Loading checkpoint")
-    model.load_state_dict(checkpoint["state_dict"])
+    if device == 'cpu':
+        state_dict = {k.replace('module.', ''): v for k, v in checkpoint['state_dict'].items()}
+        model.load_state_dict(state_dict)
+    else:
+        model.load_state_dict(checkpoint["state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer"])

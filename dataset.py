@@ -20,6 +20,9 @@ class VOCDataset(torch.utils.data.Dataset):
         self.B = B
         self.C = C
 
+    def get_classes(self):
+        return self.annotations['class_label'].unique().tolist()
+
     def __len__(self):
         return len(self.annotations)
 
